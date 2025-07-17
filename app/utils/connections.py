@@ -9,7 +9,7 @@ from typing import List
 
 class ConnectionManager():
     def __init__(self) -> None:
-        self.active_connections: List[WebSocket]
+        self.active_connections: List[WebSocket] = []
 
     async def connect(self, websocket: WebSocket) -> None:
         """
@@ -17,6 +17,7 @@ class ConnectionManager():
         """
         await websocket.accept()
         self.active_connections.append(websocket)
+        print("Added new connection")
 
     def disconnect(self, websocket: WebSocket) -> None:
         """
@@ -26,6 +27,7 @@ class ConnectionManager():
         list of active connections
         """
         self.active_connections.remove(websocket)
+        print("Removed connection")
 
     async def broadcast(self, message:str) -> None:
         """
@@ -33,7 +35,7 @@ class ConnectionManager():
         """
         # Using task buffer for better asynchronous code
         tasks = []
-        for connection in self.active_connections.copy():
+        for connection in self.active_connections:
             tasks.append(connection.send_text(message))
 
         await asyncio.gather(*tasks, return_exceptions=True)
