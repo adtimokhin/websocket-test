@@ -9,7 +9,6 @@ from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 websocket_router = APIRouter()
 
 # Endpoinds
-
 @websocket_router.websocket("/echo")
 async def websocket_endpoint(websocket: WebSocket):
     await websocket.accept()
@@ -17,15 +16,8 @@ async def websocket_endpoint(websocket: WebSocket):
     try:
         while True:
             data = await websocket.receive_text()
-            await websocket.send_text(f"{data}")
+            await websocket.send_text(data)
 
     except WebSocketDisconnect:
         print("Connection closed by client")
         return
-# Test
-@websocket_router.get("/")
-async def test():
-    """
-    Check that the server booted-up properly
-    """
-    return {"message": "test"}
