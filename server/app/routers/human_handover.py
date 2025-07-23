@@ -1,23 +1,6 @@
 """
 module that will try to simulate the human handover solution we are
 trying to intergrate into the Chat API
-
-Basic thinking:
-We have a user that communicates to the chat and gets some messages from AI
-
-At some point, we receive a message: SWITCH <-- a special message that
-will tell the connection to switch modes.
-
-If the mode is switched, the conversations will be directed to a human agent
-
-Thus, a human agent needs some way to connect to an existing conversation.
-
-
-Possible soultion:
-1) Have some state-managment of the chat for regular users.
-2) Have a mapping of the WS of users and agents that join
-3) Have two endpoints - one for users, one for agents. Allow only certain users
-to join to each endpoint
 """
 import asyncio
 
