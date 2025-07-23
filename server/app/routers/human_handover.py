@@ -64,7 +64,7 @@ async def user_endpoint(websocket: WebSocket):
     finally:
         if websocket.receipient_websocket:
             await _close_receipient_websocket_connection(websocket.receipient_websocket)
-        _user_disconnect_cleanup(websocket)
+        await _user_disconnect_cleanup(websocket)
 
 @ws_hh_router.websocket("/agent")
 async def agent_endpoint(websocket: WebSocket):
@@ -95,7 +95,7 @@ async def agent_endpoint(websocket: WebSocket):
     finally:
         if websocket.receipient_websocket:
             await _notify_user_about_agent_disconnect(websocket.receipient_websocket)
-        _agent_disconnect_cleanup(websocket)
+        await _agent_disconnect_cleanup(websocket)
 
 ################################################################################
 #                          Conversation Handlers
@@ -163,14 +163,14 @@ def _check_modify_current_conversation_state(incomming_message:str, websocket: W
     if incomming_message == "SWITCH":
         websocket.chat_mode = ChatMode.USER_AGENT # From now on the user should talk to Agent
 
-def _user_disconnect_cleanup(websocket: WebSocket):
+async def _user_disconnect_cleanup(websocket: WebSocket):
     """
     Perform cleanup for user connection
     """
     if websocket.receipient_websocket:
         websocket.receipient_websocket.receipient_websocket = None
         websocket.receipient_websocket = None
-    connection_manager.remove_connection(ConnectionType.USER, websocket)
+    await connection_manager.remove_connection(ConnectionType.USER, websocket)
 
 async def _notify_user_about_agent_disconnect(websocket: WebSocket):
     """
@@ -220,11 +220,11 @@ async def _close_receipient_websocket_connection(websocket: WebSocket):
     await websocket.send_text("User disconnected. Goodbye") # System message
     await websocket.close(code=1000, reason="User disconnected")
 
-def _agent_disconnect_cleanup(websocket: WebSocket):
+async def _agent_disconnect_cleanup(websocket: WebSocket):
     """
     Perform cleanup for agent connection
     """
     if websocket.receipient_websocket:
         websocket.receipient_websocket.receipient_websocket = None
         websocket.receipient_websocket = None
-    connection_manager.remove_connection(ConnectionType.AGENT, websocket)
+    await connection_manager.remove_connection(ConnectionType.AGENT, websocket)

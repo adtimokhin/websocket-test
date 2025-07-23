@@ -21,13 +21,13 @@ class ConnectionManager():
         """
         self.connections[connection_type].append(websocket)
 
-    def remove_connection(self, connection_type: ConnectionType, websocket: WebSocket):
+    async def remove_connection(self, connection_type: ConnectionType, websocket: WebSocket):
         """
         Removes connection
         """
-        # TODO: Add lock-protection
-        if websocket in self.connections[connection_type]:
-            self.connections[connection_type].remove(websocket)
+        async with self.connection_lock:
+            if websocket in self.connections[connection_type]:
+                self.connections[connection_type].remove(websocket)
 
     async def establish_connection(self, agent_websocket: WebSocket) -> Optional[WebSocket]:
         """
