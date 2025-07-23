@@ -43,7 +43,7 @@ async def user_endpoint(websocket: WebSocket):
     
     # Initial setup
     _add_user_websocket_attributes(websocket)
-    connection_manager.add_connection(ConnectionType.USER, websocket)
+    await connection_manager.add_connection(ConnectionType.USER, websocket)
 
     try:
         while True:
@@ -71,7 +71,7 @@ async def agent_endpoint(websocket: WebSocket):
     await websocket.accept()
     # Initial setup
     _add_agent_websocket_attributes(websocket)
-    connection_manager.add_connection(ConnectionType.AGENT, websocket)
+    await connection_manager.add_connection(ConnectionType.AGENT, websocket)
 
     try:
         # Connection establishing

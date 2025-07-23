@@ -15,11 +15,12 @@ class ConnectionManager():
         self.connections: Dict[ConnectionType, List[WebSocket]] = defaultdict(list)
         self.connection_lock = asyncio.Lock()
 
-    def add_connection(self, connection_type: ConnectionType, websocket: WebSocket) -> None:
+    async def add_connection(self, connection_type: ConnectionType, websocket: WebSocket) -> None:
         """
         Add the new websocket connection to the list of current connections
         """
-        self.connections[connection_type].append(websocket)
+        async with self.connection_lock:
+            self.connections[connection_type].append(websocket)
 
     async def remove_connection(self, connection_type: ConnectionType, websocket: WebSocket):
         """
