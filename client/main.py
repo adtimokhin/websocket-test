@@ -11,9 +11,11 @@ import asyncio
 import websockets # type: ignore
 import sys
 import threading
+"ws://127.0.0.1:8080/hh/user"
 
 ECHO_URI = "ws://127.0.0.1:8080/echo"
 BROADCAST_URI = "ws://127.0.0.1:8080/broadcast"
+CHAT_URI = "ws://127.0.0.1:8080/chat/a7cf173b"
 
 class BroadcastClient:
     def __init__(self, uri: str):
@@ -128,9 +130,10 @@ if __name__ == "__main__":
             uri = ECHO_URI
         elif sys.argv[1] == "broadcast":
             uri = BROADCAST_URI
+        elif sys.argv[1] == "chat":
+            uri = CHAT_URI
         else:
-            print("Usage: python client.py [echo|broadcast]")
-            sys.exit(1)
+            uri = sys.argv[1]
     else:
         uri = BROADCAST_URI  # Default to broadcast
     
