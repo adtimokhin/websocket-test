@@ -54,9 +54,29 @@ python main.py broadcast
 
 # Connect to echo mode
 python main.py echo
+
+# Connect to echo mode
+python main.py [`endpoint`]
 ```
 
-### Server Endpoints
+### Human Handover Feature Setup
+You can start a client to take on a role of an end-user (or user) or a human agent (or agent)
+This client has two scripts that will setup both of user types. Notes, these bash files will also
+start the venv for you
+
+#### To Compile Bash Scripts
+```bash
+chmod +x start-user.sh
+chmod +x start-agent.sh
+```
+
+#### To Run Bash Scripts
+```bash
+./start-user.sh
+./start-agent.sh
+```
+
+## Server Endpoints
 
 The client expects the following WebSocket endpoints to be available:
 

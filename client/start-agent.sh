@@ -9,4 +9,4 @@ fi
 source venv/bin/activate
 
 # Run the main Python script with the WebSocket URL argument
-python main.py "ws://127.0.0.1:8080/hh/agnet"
+python main.py "ws://127.0.0.1:8080/hh/agent"
