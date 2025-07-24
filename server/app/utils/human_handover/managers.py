@@ -3,34 +3,51 @@ This is the module for the in-memory managers that will be needed for the
 human handover feature
 """
 import asyncio
+import uuid
 
 from fastapi import WebSocket
-from collections import defaultdict
-from typing import Dict, List, Optional
+from typing import Optional
+from utils.connection_pool import Connection
 
-from utils.enums import ConnectionType, ChatMode
 
 class ConnectionManager():
     def __init__(self) -> None:
-        self.connections: Dict[ConnectionType, List[WebSocket]] = defaultdict(list)
         self.connection_lock = asyncio.Lock()
 
-    async def add_connection(self, connection_type: ConnectionType, websocket: WebSocket) -> None:
+    def _generate_connection_id(self) -> str:
         """
-        Add the new websocket connection to the list of current connections
+        Generate a unique connection ID.
         """
-        async with self.connection_lock:
-            self.connections[connection_type].append(websocket)
+        return str(uuid.uuid4())
 
-    async def remove_connection(self, connection_type: ConnectionType, websocket: WebSocket):
+    async def add_connection(self, websocket: WebSocket, tenant_id:str = "tenant_123") -> None:
         """
-        Removes connection
+        Add the new websocket connection to the list of current connections.
+        Now, this method connection to an active wait list.
         """
-        async with self.connection_lock:
-            if websocket in self.connections[connection_type]:
-                self.connections[connection_type].remove(websocket)
+        pool = websocket.app.state.connections
+        conn_id = self._generate_connection_id()
 
-    async def establish_connection(self, agent_websocket: WebSocket) -> Optional[WebSocket]:
+        websocket.conn_id = conn_id
+        websocket.tenant_id = tenant_id
+        pool.add_connection(Connection(conn_id, tenant_id, websocket))
+
+
+
+    async def remove_connection(self, connections, websocket: WebSocket):
+        """
+        Removes connection from a list of waiting connections.
+        Make sure that it was initially added to the manager!
+        """
+        pool = connections
+        if websocket.conn_id:
+            # In a queue
+            conn_id = websocket.conn_id
+            tenant_id = websocket.tenant_id
+            if conn_id:
+                 pool.remove_connection(tenant_id, conn_id)
+
+    async def establish_connection(self, agent_websocket: WebSocket, connections, tenant_id:str = "tenant_123") -> Optional[WebSocket]:
         """
         Attempts to connect two websockets together.
 
@@ -39,19 +56,20 @@ class ConnectionManager():
 
         If no link was established, agent recieves None.
         """
+        #TODO: Not sure of the type for the connection objecy
         if agent_websocket.receipient_websocket:
             # Already in conversation
             return None
         
-        async with self.connection_lock:
-            for user_connection in self.connections[ConnectionType.USER]:
-                # We take the first connection that awaits agent connection
-                if user_connection.chat_mode is ChatMode.USER_AGENT and \
-                    user_connection.receipient_websocket is None:
-                    # This should be atomic
-                    user_connection.receipient_websocket = agent_websocket
-                    agent_websocket.receipient_websocket = user_connection
-                    return user_connection
-            
-            return None
+        pool = connections
+        next_conn = pool.get_next_connection(tenant_id)
+        if next_conn:
+            user_websocket = next_conn.data
 
+            user_websocket.receipient_websocket = agent_websocket
+            agent_websocket.receipient_websocket = user_websocket
+
+            await self.remove_connection(connections=connections,\
+                                         websocket=user_websocket)
+            return user_websocket
+        return None
