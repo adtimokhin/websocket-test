@@ -12,25 +12,28 @@ from utils.enums import ConnectionType, ChatMode
 
 class ConnectionManager():
     def __init__(self) -> None:
-        self.connections: Dict[ConnectionType, List[WebSocket]] = defaultdict(list)
         self.connection_lock = asyncio.Lock()
 
-    async def add_connection(self, connection_type: ConnectionType, websocket: WebSocket) -> None:
+    async def add_connection(self, websocket: WebSocket) -> None:
         """
         Add the new websocket connection to the list of current connections
         """
-        async with self.connection_lock:
-            self.connections[connection_type].append(websocket)
+        websocket.app.state.connections.append(websocket)
+        print(f"there are {len(websocket.app.state.connections)} connections")
 
-    async def remove_connection(self, connection_type: ConnectionType, websocket: WebSocket):
+
+    async def remove_connection(self, websocket: WebSocket):
         """
         Removes connection
         """
-        async with self.connection_lock:
-            if websocket in self.connections[connection_type]:
-                self.connections[connection_type].remove(websocket)
+        try:
+            websocket.app.state.connections.remove(websocket)
+        except ValueError as e:
+            print(f"Could not remove websocket - it does not exist on app.state.connections, {e}")
+        finally:
+            print(f"there are {len(websocket.app.state.connections)} connections")
 
-    async def establish_connection(self, agent_websocket: WebSocket) -> Optional[WebSocket]:
+    async def establish_connection(self, agent_websocket: WebSocket, connections) -> Optional[WebSocket]:
         """
         Attempts to connect two websockets together.
 
@@ -39,19 +42,24 @@ class ConnectionManager():
 
         If no link was established, agent recieves None.
         """
+        #TODO: Not sure of the type for the connection objecy
         if agent_websocket.receipient_websocket:
             # Already in conversation
             return None
         
         async with self.connection_lock:
-            for user_connection in self.connections[ConnectionType.USER]:
-                # We take the first connection that awaits agent connection
-                if user_connection.chat_mode is ChatMode.USER_AGENT and \
-                    user_connection.receipient_websocket is None:
+            for client in connections:
+                if client == agent_websocket:
+                    continue
+
+                if client.connection_type == ConnectionType.AGENT:
+                    continue
+
+                if client.chat_mode is ChatMode.USER_AGENT and \
+                    client.receipient_websocket is None:
                     # This should be atomic
-                    user_connection.receipient_websocket = agent_websocket
-                    agent_websocket.receipient_websocket = user_connection
-                    return user_connection
-            
+                    client.receipient_websocket = agent_websocket
+                    agent_websocket.receipient_websocket = client
+                    return client
             return None
 

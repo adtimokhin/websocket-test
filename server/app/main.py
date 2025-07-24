@@ -11,6 +11,10 @@ app = FastAPI(
     title='Test Websocket',
     description='Test Websocket Endpoint - Simple echo server',
 )
+@app.on_event("startup")
+async def startup():
+    # Initialize the connection list on startup
+    app.state.connections = [] # WS connections
 
 # Adding the endpoinds
 app.include_router(websocket_router)

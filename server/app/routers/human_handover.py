@@ -4,13 +4,13 @@ trying to intergrate into the Chat API
 """
 import asyncio
 
-from fastapi import APIRouter, WebSocket, WebSocketDisconnect
+from fastapi import APIRouter, WebSocket, WebSocketDisconnect, FastAPI
 from utils.enums import ConnectionType, ChatMode
 from utils.human_handover.managers import ConnectionManager
 from typing import Optional
 
 ws_hh_router = APIRouter() # WebSocket, Human Handover Router :)
-connection_manager = ConnectionManager()
+connection_manager = ConnectionManager() # Now just a wrapper for app.state
 
 @ws_hh_router.websocket("/user")
 async def user_endpoint(websocket: WebSocket):
@@ -26,7 +26,7 @@ async def user_endpoint(websocket: WebSocket):
     
     # Initial setup
     _add_user_websocket_attributes(websocket)
-    await connection_manager.add_connection(ConnectionType.USER, websocket)
+    await connection_manager.add_connection(websocket)
 
     try:
         while True:
@@ -42,6 +42,9 @@ async def user_endpoint(websocket: WebSocket):
             
     except WebSocketDisconnect:
         print("User closed connection")
+        if websocket.receipient_websocket:
+            await _close_receipient_websocket_connection(websocket.receipient_websocket)
+        await _user_disconnect_cleanup(websocket)
     except Exception as e:
         print(f"Error in websocket connection: {e}")
     finally:
@@ -54,14 +57,15 @@ async def agent_endpoint(websocket: WebSocket):
     await websocket.accept()
     # Initial setup
     _add_agent_websocket_attributes(websocket)
-    await connection_manager.add_connection(ConnectionType.AGENT, websocket)
+    await connection_manager.add_connection(websocket)
 
     try:
         # Connection establishing
         await websocket.send_text("Looking for a connection...")
-        receipient_websocket = await _agent_establish_connection(websocket)
+        app = websocket.app
+        receipient_websocket = await _agent_establish_connection(websocket, app)
         if receipient_websocket:
-            await websocket.send_text("Connection was found")
+            await websocket.send_text("Connection found")
         else:
             await websocket.send_text("Connection Search Timeout. Goodbye")
             await websocket.close(code=1000, reason="Connection Search Timeout.")
@@ -73,6 +77,9 @@ async def agent_endpoint(websocket: WebSocket):
 
     except WebSocketDisconnect:
         print("Agent closed connection")
+        if websocket.receipient_websocket:
+            await _notify_user_about_agent_disconnect(websocket.receipient_websocket)
+        await _agent_disconnect_cleanup(websocket)
     except Exception as e:
         print(f"Error in websocket connection: {e}")
     finally:
@@ -153,7 +160,7 @@ async def _user_disconnect_cleanup(websocket: WebSocket):
     if websocket.receipient_websocket:
         websocket.receipient_websocket.receipient_websocket = None
         websocket.receipient_websocket = None
-    await connection_manager.remove_connection(ConnectionType.USER, websocket)
+    await connection_manager.remove_connection(websocket)
 
 async def _notify_user_about_agent_disconnect(websocket: WebSocket):
     """
@@ -175,16 +182,18 @@ def _add_agent_websocket_attributes(websocket: WebSocket):
     websocket.connection_type = ConnectionType.AGENT
     websocket.receipient_websocket = None
 
-async def _agent_establish_connection(websocket: WebSocket, timeout_seconds: int = 60) -> Optional[WebSocket]:
+async def _agent_establish_connection(websocket: WebSocket,  app: FastAPI,  timeout_seconds: int = 60) -> Optional[WebSocket]:
     """
     Only agents can establish connections. We will try to establish connection,
     by waiting for some time to get an idle user. We stop trying after some timeout
     """
     interval = 2 # Time in seconds
     total_waited = 0
+    # All connections
+    connections = app.state.connections
 
     while total_waited < timeout_seconds:
-        result = await connection_manager.establish_connection(websocket)
+        result = await connection_manager.establish_connection(websocket, connections)
         if result is not None:
             return result
 
@@ -210,4 +219,4 @@ async def _agent_disconnect_cleanup(websocket: WebSocket):
     if websocket.receipient_websocket:
         websocket.receipient_websocket.receipient_websocket = None
         websocket.receipient_websocket = None
-    await connection_manager.remove_connection(ConnectionType.AGENT, websocket)
+    await connection_manager.remove_connection(websocket)
