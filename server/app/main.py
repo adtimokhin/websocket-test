@@ -7,14 +7,17 @@ from fastapi import FastAPI
 from routers.websocket import websocket_router
 from routers.human_handover import ws_hh_router
 
+from utils.connection_pool import WaitingPool
+
 app = FastAPI(
     title='Test Websocket',
     description='Test Websocket Endpoint - Simple echo server',
 )
+
 @app.on_event("startup")
 async def startup():
     # Initialize the connection list on startup
-    app.state.connections = [] # WS connections
+    app.state.connections = WaitingPool() # WS connections
 
 # Adding the endpoinds
 app.include_router(websocket_router)

@@ -26,14 +26,13 @@ async def user_endpoint(websocket: WebSocket):
     
     # Initial setup
     _add_user_websocket_attributes(websocket)
-    await connection_manager.add_connection(websocket)
 
     try:
         while True:
             incomming_message = await websocket.receive_text()
 
             # Conversation manager logic
-            _check_modify_current_conversation_state(incomming_message, websocket)
+            await _check_modify_current_conversation_state(incomming_message, websocket)
 
             if websocket.chat_mode is ChatMode.USER_AI:
                 await _ai_conversation_handler(incomming_message, websocket)
@@ -47,17 +46,12 @@ async def user_endpoint(websocket: WebSocket):
         await _user_disconnect_cleanup(websocket)
     except Exception as e:
         print(f"Error in websocket connection: {e}")
-    finally:
-        if websocket.receipient_websocket:
-            await _close_receipient_websocket_connection(websocket.receipient_websocket)
-        await _user_disconnect_cleanup(websocket)
 
 @ws_hh_router.websocket("/agent")
 async def agent_endpoint(websocket: WebSocket):
     await websocket.accept()
     # Initial setup
     _add_agent_websocket_attributes(websocket)
-    await connection_manager.add_connection(websocket)
 
     try:
         # Connection establishing
@@ -79,13 +73,10 @@ async def agent_endpoint(websocket: WebSocket):
         print("Agent closed connection")
         if websocket.receipient_websocket:
             await _notify_user_about_agent_disconnect(websocket.receipient_websocket)
+            await connection_manager.add_connection(websocket.receipient_websocket)
         await _agent_disconnect_cleanup(websocket)
     except Exception as e:
         print(f"Error in websocket connection: {e}")
-    finally:
-        if websocket.receipient_websocket:
-            await _notify_user_about_agent_disconnect(websocket.receipient_websocket)
-        await _agent_disconnect_cleanup(websocket)
 
 ################################################################################
 #                          Conversation Handlers
@@ -135,7 +126,7 @@ def _add_user_websocket_attributes(websocket: WebSocket):
     websocket.chat_mode  = ChatMode.USER_AI
     websocket.receipient_websocket = None
 
-def _check_modify_current_conversation_state(incomming_message:str, websocket: WebSocket):
+async def _check_modify_current_conversation_state(incomming_message:str, websocket: WebSocket):
     """
     This function is the place where the user connection will switch from
     USER-AI to USER-AGENT states. The logic of whether that must happen will
@@ -152,6 +143,7 @@ def _check_modify_current_conversation_state(incomming_message:str, websocket: W
     
     if incomming_message == "SWITCH":
         websocket.chat_mode = ChatMode.USER_AGENT # From now on the user should talk to Agent
+        await connection_manager.add_connection(websocket)
 
 async def _user_disconnect_cleanup(websocket: WebSocket):
     """
@@ -160,7 +152,7 @@ async def _user_disconnect_cleanup(websocket: WebSocket):
     if websocket.receipient_websocket:
         websocket.receipient_websocket.receipient_websocket = None
         websocket.receipient_websocket = None
-    await connection_manager.remove_connection(websocket)
+    await connection_manager.remove_connection(websocket.app.state.connections, websocket)
 
 async def _notify_user_about_agent_disconnect(websocket: WebSocket):
     """
@@ -219,4 +211,3 @@ async def _agent_disconnect_cleanup(websocket: WebSocket):
     if websocket.receipient_websocket:
         websocket.receipient_websocket.receipient_websocket = None
         websocket.receipient_websocket = None
-    await connection_manager.remove_connection(websocket)
